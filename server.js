@@ -1,9 +1,10 @@
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const ROOT = __dirname;
 
 const mime = {
@@ -22,31 +23,36 @@ function send(res, status, data, type = 'application/json; charset=utf-8') {
 }
 
 async function translate(text, source, target) {
-  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not configured on the server.');
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-5-mini',
-      input: `Translate the following spoken sentence from ${source} to ${target}. Return only the natural translation, with no explanation. Preserve names, numbers, intent, and conversational tone.\n\n${text}`
-    })
-  });
+  const sourceCode = source.split('-')[0].toLowerCase();
+  const targetCode = target.split('-')[0].toLowerCase();
+
+  if (sourceCode === targetCode) return text;
+
+  const url = new URL('https://api.mymemory.translated.net/get');
+  url.searchParams.set('q', text);
+  url.searchParams.set('langpair', `${sourceCode}|${targetCode}`);
+
+  const response = await fetch(url);
+  const raw = await response.text();
 
   if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`Translation service error: ${response.status} ${details}`);
+    throw new Error(`Free translation service error: ${response.status} ${raw}`);
   }
 
-  const data = await response.json();
-  const output = data.output_text || data.output?.flatMap(item => item.content || [])
-    ?.filter(item => item.type === 'output_text')
-    ?.map(item => item.text)
-    ?.join('') || '';
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error('Free translation service returned invalid JSON.');
+  }
 
-  if (!output) throw new Error('The translation service returned no text.');
+  if (data.responseStatus && Number(data.responseStatus) !== 200) {
+    throw new Error(data.responseDetails || 'Free translation service rejected the request.');
+  }
+
+  const output = data.responseData?.translatedText;
+  if (!output) throw new Error('The free translation service returned no text.');
+
   return output.trim();
 }
 
@@ -71,6 +77,7 @@ const server = http.createServer(async (req, res) => {
         const translation = await translate(text, source, target);
         send(res, 200, { translation });
       } catch (error) {
+        console.error('TRANSLATION ERROR:', error.message);
         send(res, 500, { error: error.message });
       }
     });
