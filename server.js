@@ -15,6 +15,9 @@ const mime = {
 
 function send(res, status, data, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' });
+  if (Buffer.isBuffer(data) || data instanceof Uint8Array) {
+    return res.end(data);
+  }
   res.end(typeof data === 'string' ? data : JSON.stringify(data));
 }
 
