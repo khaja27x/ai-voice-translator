@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Mediator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header>
+      <p class="eyebrow">AI VOICE MEDIATOR</p>
+      <h1>Voice Translator</h1>
+      <p class="subtitle">Speak in your language. Let the app translate and speak for you.</p>
+    </header>
+
+    <section class="controls" aria-label="Language controls">
+      <label>Person A
+        <select id="languageA">
+          <option value="en-US">English</option>
+          <option value="te-IN">Telugu</option>
+        </select>
+      </label>
+      <button id="swapBtn" class="swap" title="Swap languages">⇄</button>
+      <label>Person B
+        <select id="languageB">
+          <option value="te-IN" selected>Telugu</option>
+          <option value="en-US">English</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="conversation" aria-live="polite">
+      <article class="person-card">
+        <div class="card-head"><span>Person A</span><span id="statusA">Ready</span></div>
+        <button id="speakA" class="mic">🎙️ <span>Speak</span></button>
+        <p id="heardA" class="heard">Your speech will appear here.</p>
+        <div class="translation"><strong>Translation</strong><p id="translatedA">—</p></div>
+        <button id="playA" class="play" disabled>🔊 Play translation</button>
+      </article>
+
+      <article class="person-card">
+        <div class="card-head"><span>Person B</span><span id="statusB">Ready</span></div>
+        <button id="speakB" class="mic">🎙️ <span>Speak</span></button>
+        <p id="heardB" class="heard">Your speech will appear here.</p>
+        <div class="translation"><strong>Translation</strong><p id="translatedB">—</p></div>
+        <button id="playB" class="play" disabled>🔊 Play translation</button>
+      </article>
+    </section>
+
+    <p class="note">MVP uses your browser's speech recognition and speech synthesis. Internet translation will be added in the next version.</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
