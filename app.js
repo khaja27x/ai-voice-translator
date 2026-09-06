@@ -5,6 +5,19 @@ const state = {
   B: { recognition: null, text: '', translation: '' }
 };
 
+async function translateWithAI(text, source, target) {
+  const sourceName = source.startsWith('te') ? 'Telugu' : 'English';
+  const targetName = target.startsWith('te') ? 'Telugu' : 'English';
+  const response = await fetch('/api/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, source: sourceName, target: targetName })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Translation failed');
+  return data.translation;
+}
+
 function setupSpeaker(person) {
   const source = $(`language${person}`);
   const target = $(`language${person === 'A' ? 'B' : 'A'}`);
@@ -33,20 +46,34 @@ function setupSpeaker(person) {
     speak.querySelector('span').textContent = 'Listening…';
     recognition.start();
 
-    recognition.onresult = (event) => {
+    recognition.onresult = async (event) => {
       const text = event.results[0][0].transcript;
       state[person].text = text;
       heard.textContent = `“${text}”`;
-      translated.textContent = translateDemo(text, source.value, target.value);
-      state[person].translation = translated.textContent;
-      play.disabled = false;
+      translated.textContent = 'Translating with AI…';
+      play.disabled = true;
+
+      try {
+        const translation = await translateWithAI(text, source.value, target.value);
+        state[person].translation = translation;
+        translated.textContent = translation;
+        play.disabled = false;
+        status.textContent = 'Translation ready';
+      } catch (error) {
+        translated.textContent = 'Translation unavailable. Check the server/API key.';
+        status.textContent = 'Translation error';
+        console.error(error);
+      }
     };
 
-    recognition.onerror = () => { status.textContent = 'Could not hear you'; };
+    recognition.onerror = (event) => {
+      status.textContent = `Microphone error: ${event.error}`;
+    };
+
     recognition.onend = () => {
-      status.textContent = 'Ready';
       speak.classList.remove('listening');
       speak.querySelector('span').textContent = 'Speak';
+      if (status.textContent === 'Listening…') status.textContent = 'Ready';
     };
   });
 
@@ -57,12 +84,6 @@ function setupSpeaker(person) {
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   });
-}
-
-function translateDemo(text, source, target) {
-  // Temporary MVP translation. Replace this function with an API call later.
-  if (source === target) return text;
-  return `[${target.startsWith('te') ? 'Telugu' : 'English'} translation] ${text}`;
 }
 
 $('swapBtn').addEventListener('click', () => {
