@@ -5,6 +5,8 @@ const state = {
   B: { recognition: null, text: '', translation: '' }
 };
 
+let activePerson = null;
+
 async function translateWithAI(text, source, target) {
   const sourceName = source.startsWith('te') ? 'Telugu' : 'English';
   const targetName = target.startsWith('te') ? 'Telugu' : 'English';
@@ -18,10 +20,15 @@ async function translateWithAI(text, source, target) {
   return data.translation;
 }
 
-function speakTranslation(text, language) {
-  if (!text || !window.speechSynthesis) return;
+function speakTranslation(text, language, onDone) {
+  if (!text || !window.speechSynthesis) {
+    if (onDone) onDone();
+    return;
+  }
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = language;
+  utterance.onend = () => onDone && onDone();
+  utterance.onerror = () => onDone && onDone();
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
@@ -43,8 +50,14 @@ function setupSpeaker(person) {
   }
 
   speak.addEventListener('click', () => {
+    // Only one person speaks at a time.
+    if (activePerson && activePerson !== person) {
+      status.textContent = `Wait for Person ${activePerson}`;
+      return;
+    }
     if (state[person].recognition) return;
 
+    activePerson = person;
     const recognition = new SpeechRecognition();
     state[person].recognition = recognition;
     recognition.lang = source.value;
@@ -59,6 +72,7 @@ function setupSpeaker(person) {
       recognition.start();
     } catch (error) {
       state[person].recognition = null;
+      activePerson = null;
       console.error(error);
     }
 
@@ -77,29 +91,24 @@ function setupSpeaker(person) {
         state[person].translation = translation;
         translated.textContent = translation;
         play.disabled = false;
-        status.textContent = 'Speaking translation…';
+        status.textContent = 'Translation ready';
 
-        // Automatically speak the translation. No second button click needed.
-        speakTranslation(translation, target.value);
-
-        // After the translated speech finishes, make the same speaker ready again.
-        const waitForSpeech = () => {
-          if (window.speechSynthesis && window.speechSynthesis.speaking) {
-            setTimeout(waitForSpeech, 150);
-          } else {
-            status.textContent = 'Ready — speak again';
-          }
-        };
-        setTimeout(waitForSpeech, 200);
+        // Automatically speak the translation for the other person.
+        speakTranslation(translation, target.value, () => {
+          activePerson = null;
+          status.textContent = `Person ${person === 'A' ? 'B' : 'A'} can respond`;
+        });
       } catch (error) {
         translated.textContent = 'Translation unavailable.';
         status.textContent = 'Translation error';
+        activePerson = null;
         console.error(error);
       }
     };
 
     recognition.onerror = (event) => {
       status.textContent = `Microphone error: ${event.error}`;
+      activePerson = null;
     };
 
     recognition.onend = () => {
@@ -110,7 +119,7 @@ function setupSpeaker(person) {
     };
   });
 
-  // Manual replay is still available if needed.
+  // Manual replay remains available.
   play.addEventListener('click', () => {
     if (!state[person].translation) return;
     speakTranslation(state[person].translation, target.value);
