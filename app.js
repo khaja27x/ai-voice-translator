@@ -82,17 +82,16 @@ function setupSpeaker(person) {
       state[person].text = text;
       heard.textContent = `“${text}”`;
 
-      // PERSON B: only listen and display what B said.
-      // Do NOT translate B automatically.
+      // Person B: recording only. There is NO automatic translation.
       if (person === 'B') {
-        translated.textContent = 'No automatic translation';
-        play.disabled = true;
-        status.textContent = 'Person B response recorded';
+        translated.textContent = 'Tap “Translate to English” when needed.';
+        play.disabled = false;
+        status.textContent = 'Response recorded';
         activePerson = null;
         return;
       }
 
-      // PERSON A: automatically translate and speak the translation.
+      // Person A: automatic translation + automatic speech.
       translated.textContent = 'Translating…';
       play.disabled = true;
       status.textContent = 'Translating…';
@@ -129,7 +128,6 @@ function setupSpeaker(person) {
     };
   });
 
-  // Manual replay is only useful for Person A's automatic translation.
   play.addEventListener('click', () => {
     if (person !== 'A' || !state[person].translation) return;
     speakTranslation(state[person].translation, target.value);
@@ -144,3 +142,30 @@ $('swapBtn').addEventListener('click', () => {
 
 setupSpeaker('A');
 setupSpeaker('B');
+
+// B's button performs translation only when B explicitly asks for it.
+const playB = $('playB');
+playB.textContent = '🌐 Translate to English';
+playB.disabled = true;
+playB.addEventListener('click', async () => {
+  if (!state.B.text) return;
+
+  const translated = $('translatedB');
+  const status = $('statusB');
+  playB.disabled = true;
+  translated.textContent = 'Translating…';
+  status.textContent = 'Translating to English…';
+
+  try {
+    const result = await translateWithAI(state.B.text, $('languageB').value, $('languageA').value);
+    state.B.translation = result;
+    translated.textContent = result;
+    status.textContent = 'Translation ready';
+  } catch (error) {
+    translated.textContent = 'Translation unavailable.';
+    status.textContent = 'Translation error';
+    console.error(error);
+  } finally {
+    playB.disabled = false;
+  }
+});
