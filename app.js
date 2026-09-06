@@ -18,6 +18,14 @@ async function translateWithAI(text, source, target) {
   return data.translation;
 }
 
+function speakTranslation(text, language) {
+  if (!text || !window.speechSynthesis) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = language;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
 function setupSpeaker(person) {
   const source = $(`language${person}`);
   const target = $(`language${person === 'A' ? 'B' : 'A'}`);
@@ -35,6 +43,8 @@ function setupSpeaker(person) {
   }
 
   speak.addEventListener('click', () => {
+    if (state[person].recognition) return;
+
     const recognition = new SpeechRecognition();
     state[person].recognition = recognition;
     recognition.lang = source.value;
@@ -44,23 +54,45 @@ function setupSpeaker(person) {
     status.textContent = 'Listening…';
     speak.classList.add('listening');
     speak.querySelector('span').textContent = 'Listening…';
-    recognition.start();
+
+    try {
+      recognition.start();
+    } catch (error) {
+      state[person].recognition = null;
+      console.error(error);
+    }
 
     recognition.onresult = async (event) => {
-      const text = event.results[0][0].transcript;
+      const text = event.results[0][0].transcript.trim();
+      if (!text) return;
+
       state[person].text = text;
       heard.textContent = `“${text}”`;
-      translated.textContent = 'Translating with AI…';
+      translated.textContent = 'Translating…';
       play.disabled = true;
+      status.textContent = 'Translating…';
 
       try {
         const translation = await translateWithAI(text, source.value, target.value);
         state[person].translation = translation;
         translated.textContent = translation;
         play.disabled = false;
-        status.textContent = 'Translation ready';
+        status.textContent = 'Speaking translation…';
+
+        // Automatically speak the translation. No second button click needed.
+        speakTranslation(translation, target.value);
+
+        // After the translated speech finishes, make the same speaker ready again.
+        const waitForSpeech = () => {
+          if (window.speechSynthesis && window.speechSynthesis.speaking) {
+            setTimeout(waitForSpeech, 150);
+          } else {
+            status.textContent = 'Ready — speak again';
+          }
+        };
+        setTimeout(waitForSpeech, 200);
       } catch (error) {
-        translated.textContent = 'Translation unavailable. Check the server/API key.';
+        translated.textContent = 'Translation unavailable.';
         status.textContent = 'Translation error';
         console.error(error);
       }
@@ -71,18 +103,17 @@ function setupSpeaker(person) {
     };
 
     recognition.onend = () => {
+      state[person].recognition = null;
       speak.classList.remove('listening');
       speak.querySelector('span').textContent = 'Speak';
       if (status.textContent === 'Listening…') status.textContent = 'Ready';
     };
   });
 
+  // Manual replay is still available if needed.
   play.addEventListener('click', () => {
-    if (!state[person].translation || !window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(state[person].translation);
-    utterance.lang = target.value;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    if (!state[person].translation) return;
+    speakTranslation(state[person].translation, target.value);
   });
 }
 
