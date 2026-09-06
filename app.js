@@ -50,7 +50,6 @@ function setupSpeaker(person) {
   }
 
   speak.addEventListener('click', () => {
-    // Only one person speaks at a time.
     if (activePerson && activePerson !== person) {
       status.textContent = `Wait for Person ${activePerson}`;
       return;
@@ -82,6 +81,18 @@ function setupSpeaker(person) {
 
       state[person].text = text;
       heard.textContent = `“${text}”`;
+
+      // PERSON B: only listen and display what B said.
+      // Do NOT translate B automatically.
+      if (person === 'B') {
+        translated.textContent = 'No automatic translation';
+        play.disabled = true;
+        status.textContent = 'Person B response recorded';
+        activePerson = null;
+        return;
+      }
+
+      // PERSON A: automatically translate and speak the translation.
       translated.textContent = 'Translating…';
       play.disabled = true;
       status.textContent = 'Translating…';
@@ -91,12 +102,11 @@ function setupSpeaker(person) {
         state[person].translation = translation;
         translated.textContent = translation;
         play.disabled = false;
-        status.textContent = 'Translation ready';
+        status.textContent = 'Speaking translation…';
 
-        // Automatically speak the translation for the other person.
         speakTranslation(translation, target.value, () => {
           activePerson = null;
-          status.textContent = `Person ${person === 'A' ? 'B' : 'A'} can respond`;
+          status.textContent = 'Person B can respond';
         });
       } catch (error) {
         translated.textContent = 'Translation unavailable.';
@@ -119,9 +129,9 @@ function setupSpeaker(person) {
     };
   });
 
-  // Manual replay remains available.
+  // Manual replay is only useful for Person A's automatic translation.
   play.addEventListener('click', () => {
-    if (!state[person].translation) return;
+    if (person !== 'A' || !state[person].translation) return;
     speakTranslation(state[person].translation, target.value);
   });
 }
