@@ -1,59 +1,69 @@
-require('dotenv').config();
-
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
+const MAX_BODY = 100_000;
 
-const mime = {
+const MIME = {
   '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8'
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon'
 };
 
-function send(res, status, data, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' });
-  if (Buffer.isBuffer(data) || data instanceof Uint8Array) {
-    return res.end(data);
-  }
-  res.end(typeof data === 'string' ? data : JSON.stringify(data));
+const LANGUAGE_CODES = new Set(['en', 'te', 'hi', 'ta', 'kn', 'ml', 'mr', 'bn', 'gu', 'pa']);
+
+function send(res, status, payload, type = 'application/json; charset=utf-8') {
+  res.writeHead(status, {
+    'Content-Type': type,
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store'
+  });
+  res.end(typeof payload === 'string' || Buffer.isBuffer(payload) ? payload : JSON.stringify(payload));
+}
+
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > MAX_BODY) {
+        reject(new Error('Request is too large.'));
+        req.destroy();
+      }
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body || '{}')); }
+      catch { reject(new Error('Invalid JSON.')); }
+    });
+    req.on('error', reject);
+  });
 }
 
 async function translate(text, source, target) {
-  const sourceCode = source.split('-')[0].toLowerCase();
-  const targetCode = target.split('-')[0].toLowerCase();
+  const sourceCode = String(source || '').split('-')[0].toLowerCase();
+  const targetCode = String(target || '').split('-')[0].toLowerCase();
 
+  if (!LANGUAGE_CODES.has(sourceCode) || !LANGUAGE_CODES.has(targetCode)) {
+    throw new Error('Unsupported language code.');
+  }
   if (sourceCode === targetCode) return text;
 
   const url = new URL('https://api.mymemory.translated.net/get');
-  url.searchParams.set('q', text);
+  url.searchParams.set('q', text.slice(0, 4000));
   url.searchParams.set('langpair', `${sourceCode}|${targetCode}`);
 
-  const response = await fetch(url);
-  const raw = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`Free translation service error: ${response.status} ${raw}`);
-  }
-
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error('Free translation service returned invalid JSON.');
-  }
-
-  if (data.responseStatus && Number(data.responseStatus) !== 200) {
-    throw new Error(data.responseDetails || 'Free translation service rejected the request.');
-  }
-
-  const output = data.responseData?.translatedText;
-  if (!output) throw new Error('The free translation service returned no text.');
-
-  return output.trim();
+  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!response.ok) throw new Error(`Translation service returned ${response.status}.`);
+  const data = await response.json();
+  const translated = data?.responseData?.translatedText;
+  if (!translated) throw new Error(data?.responseDetails || 'No translation was returned.');
+  return translated.trim();
 }
 
 const server = http.createServer(async (req, res) => {
@@ -67,33 +77,28 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && req.url === '/api/translate') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', async () => {
-      try {
-        const { text, source, target } = JSON.parse(body || '{}');
-        if (!text || !source || !target) return send(res, 400, { error: 'text, source and target are required.' });
-        if (source === target) return send(res, 200, { translation: text });
-        const translation = await translate(text, source, target);
-        send(res, 200, { translation });
-      } catch (error) {
-        console.error('TRANSLATION ERROR:', error.message);
-        send(res, 500, { error: error.message });
-      }
-    });
-    return;
+    try {
+      const { text, source, target } = await readJson(req);
+      if (typeof text !== 'string' || !text.trim()) return send(res, 400, { error: 'Text is required.' });
+      if (!source || !target) return send(res, 400, { error: 'Source and target languages are required.' });
+      const translation = await translate(text.trim(), source, target);
+      return send(res, 200, { translation });
+    } catch (error) {
+      console.error(error);
+      return send(res, 500, { error: error.message || 'Translation failed.' });
+    }
   }
 
-  const requested = req.url === '/' ? '/index.html' : req.url;
-  const safePath = path.normalize(requested).replace(/^([.][.][/\\])+/, '');
-  const filePath = path.join(ROOT, safePath);
+  const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
+  const requested = pathname === '/' ? '/index.html' : pathname;
+  const relative = path.normalize(requested).replace(/^([/\\])+/, '');
+  const filePath = path.resolve(ROOT, relative);
+  if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) return send(res, 403, { error: 'Forbidden.' });
 
-  if (!filePath.startsWith(ROOT)) return send(res, 403, { error: 'Forbidden' });
   fs.readFile(filePath, (error, content) => {
     if (error) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
-    const type = mime[path.extname(filePath)] || 'application/octet-stream';
-    send(res, 200, content, type);
+    send(res, 200, content, MIME[path.extname(filePath)] || 'application/octet-stream');
   });
 });
 
-server.listen(PORT, () => console.log(`Voice Mediator running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`MediTranslate running at http://localhost:${PORT}`));

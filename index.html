@@ -1,54 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Voice Mediator</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="MediTranslate is a turn-by-turn AI voice translator for two people speaking different languages.">
+  <title>MediTranslate — AI Voice Mediator</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="app">
-    <header>
-      <p class="eyebrow">AI VOICE MEDIATOR • V2</p>
-      <h1>Voice Translator</h1>
-      <p class="subtitle">Speak naturally. AI translates your words for the other person.</p>
+  <div class="background-glow"></div>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">M</div>
+        <div><h1>MediTranslate</h1><p>AI Voice Mediator</p></div>
+      </div>
+      <div class="privacy">🔒 Private by design</div>
     </header>
 
-    <section class="controls" aria-label="Language controls">
-      <label>Person A
-        <select id="languageA">
-          <option value="en-US">English</option>
-          <option value="te-IN">Telugu</option>
-        </select>
-      </label>
-      <button id="swapBtn" class="swap" title="Swap languages">⇄</button>
-      <label>Person B
-        <select id="languageB">
-          <option value="te-IN" selected>Telugu</option>
-          <option value="en-US">English</option>
-        </select>
-      </label>
+    <section class="hero">
+      <div>
+        <span class="eyebrow">CONVERSATION MODE</span>
+        <h2>Two people. Two languages. <span>One conversation.</span></h2>
+        <p>Speak in your language and let the mediator translate it for the other person. Each turn is controlled manually.</p>
+      </div>
+      <button id="clearBtn" class="ghost-btn">Clear conversation</button>
     </section>
 
-    <section class="conversation" aria-live="polite">
-      <article class="person-card">
-        <div class="card-head"><span>Person A</span><span id="statusA">Ready</span></div>
-        <button id="speakA" class="mic">🎙️ <span>Speak</span></button>
-        <p id="heardA" class="heard">Your speech will appear here.</p>
-        <div class="translation"><strong>AI Translation</strong><p id="translatedA">—</p></div>
-        <button id="playA" class="play" disabled>🔊 Speak translation</button>
+    <section class="language-bar" aria-label="Language selection">
+      <div class="language-side"><span class="person-dot a">A</span><label for="languageA">Person A</label><select id="languageA"></select></div>
+      <button id="swapBtn" class="swap-btn" title="Swap languages" aria-label="Swap languages">⇄</button>
+      <div class="language-side"><span class="person-dot b">B</span><label for="languageB">Person B</label><select id="languageB"></select></div>
+    </section>
+
+    <div id="notice" class="notice" role="status">Choose a language and start with Person A.</div>
+
+    <section class="mediator-grid">
+      <article class="speaker-card person-a">
+        <div class="card-header"><div><span class="mini-label">PERSON A</span><h3>Speak your language</h3></div><span id="statusA" class="status ready">Ready</span></div>
+        <button id="speakA" class="mic-button"><span class="mic-icon">🎙</span><span class="mic-label">Hold your turn</span><small>Click to start speaking</small></button>
+        <div class="text-box"><span>YOU SAID</span><p id="heardA">Your speech will appear here.</p></div>
+        <div class="translation-box"><div><span>TRANSLATION FOR PERSON B</span><p id="translatedA">—</p></div><button id="playA" class="icon-btn" disabled title="Play translation">🔊</button></div>
       </article>
 
-      <article class="person-card">
-        <div class="card-head"><span>Person B</span><span id="statusB">Ready</span></div>
-        <button id="speakB" class="mic">🎙️ <span>Speak</span></button>
-        <p id="heardB" class="heard">Your speech will appear here.</p>
-        <div class="translation"><strong>AI Translation</strong><p id="translatedB">—</p></div>
-        <button id="playB" class="play" disabled>🔊 Speak translation</button>
+      <div class="connector"><div class="line"></div><div class="connector-icon">⇄</div><p>TURN<br>BY<br>TURN</p></div>
+
+      <article class="speaker-card person-b">
+        <div class="card-header"><div><span class="mini-label">PERSON B</span><h3>Respond in your language</h3></div><span id="statusB" class="status ready">Ready</span></div>
+        <button id="speakB" class="mic-button"><span class="mic-icon">🎙</span><span class="mic-label">Speak response</span><small>Translation is manual</small></button>
+        <div class="text-box"><span>YOU SAID</span><p id="heardB">Your response will appear here.</p></div>
+        <div class="translation-box"><div><span>TRANSLATION FOR PERSON A</span><p id="translatedB">—</p></div><div class="translation-actions"><button id="translateB" class="translate-btn" disabled>Translate</button><button id="playB" class="icon-btn" disabled title="Play translation">🔊</button></div></div>
       </article>
     </section>
 
-    <p class="note">Version 2 uses browser speech recognition plus a server-side AI translation endpoint. Keep your API key on the server—never in browser JavaScript.</p>
+    <section class="history-section">
+      <div class="section-heading"><div><span class="mini-label">LIVE TRANSCRIPT</span><h3>Conversation history</h3></div><span id="turnCount">0 turns</span></div>
+      <div id="history" class="history empty"><div class="empty-icon">💬</div><p>Your conversation will appear here.</p></div>
+    </section>
+
+    <footer><span>MediTranslate v3</span><span>Speech recognition uses your browser. Translation is processed by the configured server.</span></footer>
   </main>
   <script src="app.js"></script>
 </body>
